@@ -165,7 +165,6 @@
     )
   } else {
     resp <- GET(paste(pkg.globals$.jiraEnv, "/rest/api/2/search?jql=", query, sep = ""), add_headers("Content-Type" = "application/json"))
-    )
   }
 
   if (length(content(resp)$errorMessages[[1]]) > 0) {
