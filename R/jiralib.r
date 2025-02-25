@@ -29,13 +29,32 @@
 .jira.issues.fields <- function(default=FALSE) {
   .logTrace(paste("jira: Fetch the fields list of isuues table"), pr = FALSE)
   .logTrace(paste("jira: Running Fields Query: ", pkg.globals$.jiraEnv, "/rest/api/2/field", sep=""), pr = FALSE)
-  resp <- GET(paste(pkg.globals$.jiraEnv, "/rest/api/2/field", sep=""), add_headers("Content-Type" = "application/json"))
+  if (pkg.globals$.jiraIsCloud) {
+    resp <- GET(
+      paste(pkg.globals$.jiraEnv, "/rest/api/2/field", sep=""),
+      authenticate(pkg.globals$.jiraUser, pkg.globals$.jiraPwd, type = "basic"),
+      add_headers("Content-Type" = "application/json")
+    )
+  } else {
+    resp <- GET(
+      paste(pkg.globals$.jiraEnv, "/rest/api/2/field", sep=""),
+      add_headers("Content-Type" = "application/json")
+    )
+  }
   if (length(content(resp)) <= 0) {return(NULL)}
   df <- data.frame(do.call(rbind,content(resp)))
   df <- df[, !(colnames(df) %in% c("clauseNames", "schema"))]
   df <- as.data.frame(sapply(df, function(x) as.character(x)), stringsAsFactors = FALSE)
   if(default == TRUE){
-    resp <- GET(paste(pkg.globals$.jiraEnv, "/rest/api/2/user/columns", sep = ""), add_headers("Content-Type" = "application/json"))
+    if (pkg.globals$.jiraIsCloud) {
+      resp <- GET(
+        paste(pkg.globals$.jiraEnv, "/rest/api/2/user/columns", sep = ""),
+        authenticate(pkg.globals$.jiraUser, pkg.globals$.jiraPwd, type = "basic"),
+        add_headers("Content-Type" = "application/json")
+      )
+    } else {
+      resp <- GET(paste(pkg.globals$.jiraEnv, "/rest/api/2/user/columns", sep = ""), add_headers("Content-Type" = "application/json"))
+    }
     if (length(content(resp)) <= 0) {return(NULL)}
     ddf <- as.data.frame(do.call(rbind, content(resp)))
     df <- df[df$id %in% ddf$value,]
@@ -122,7 +141,16 @@
 .jira.issue.comments <- function(id) {
   .logTrace(paste("jira: Fetching comments of Issue -", id), pr = FALSE)
   .logTrace(paste("jira: Running comments Query: ", pkg.globals$.jiraEnv, "/rest/api/2/issue/", id, "/comment", sep=""), pr = FALSE)
-  resp <- GET(paste(pkg.globals$.jiraEnv, "/rest/api/2/issue/", id, "/comment", sep=""), add_headers("Content-Type" = "application/json"))
+  if (pkg.globals$.jiraIsCloud) {
+    resp <- GET(
+      paste(pkg.globals$.jiraEnv, "/rest/api/2/issue/", id, "/comment", sep=""),
+      authenticate(pkg.globals$.jiraUser, pkg.globals$.jiraPwd, type = "basic"),
+      add_headers("Content-Type" = "application/json")
+    )
+  } else {
+    resp <- GET(paste(pkg.globals$.jiraEnv, "/rest/api/2/issue/", id, "/comment", sep=""), add_headers("Content-Type" = "application/json"))
+    )
+  }
   df <- .jira.commentsdf(resp)
   return(df)
 }
@@ -130,8 +158,17 @@
 # Internal nJira issue search query
 .jira.searchqry <- function(query, clean = FALSE) {
   .logTrace(paste("jira: Running Search Query: ", pkg.globals$.jiraEnv, "/rest/api/2/search?jql=", query, sep = ""), pr = FALSE)
-  resp <- GET(paste(pkg.globals$.jiraEnv, "/rest/api/2/search?jql=", query, sep = ""), add_headers("Content-Type" = "application/json"))
-  
+  if (pkg.globals$.jiraIsCloud) {
+    resp <- GET(
+      paste(pkg.globals$.jiraEnv, "/rest/api/2/search?jql=", query, sep = ""),
+      authenticate(pkg.globals$.jiraUser, pkg.globals$.jiraPwd, type = "basic"),
+      add_headers("Content-Type" = "application/json")
+    )
+  } else {
+    resp <- GET(paste(pkg.globals$.jiraEnv, "/rest/api/2/search?jql=", query, sep = ""), add_headers("Content-Type" = "application/json"))
+    )
+  }
+
   if (length(content(resp)$errorMessages[[1]]) > 0) {
     .logTrace("jira: Error in Query")
     .logTrace(content(resp)$errorMessages[[1]])
