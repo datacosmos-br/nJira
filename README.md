@@ -26,7 +26,7 @@ Development version:
 ```R
 # install.packages("devtools")
 library(devtools)
-devtools::install_github("nikhilchoudhry/nJira")
+devtools::install_github("datacosmos-br/nJira")
 ```
 
 ## Getting Started

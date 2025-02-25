@@ -149,7 +149,6 @@
     )
   } else {
     resp <- GET(paste(pkg.globals$.jiraEnv, "/rest/api/2/issue/", id, "/comment", sep=""), add_headers("Content-Type" = "application/json"))
-    )
   }
   df <- .jira.commentsdf(resp)
   return(df)
