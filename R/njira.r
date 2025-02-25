@@ -68,7 +68,7 @@ jira.login <- function(jira.env = NULL, jira.user = NULL, jira.pwd = NULL, jira.
       authenticate(pkg.globals$.jiraUser, pkg.globals$.jiraPwd),
       add_headers("Content-Type" = "application/json")
     )
-    if (resp2$status_code == 400) {
+    if (resp2$status_code == 200) {
       .logTrace("Jira Login Done (on-prem)")
       pkg.globals$.jiraIsActive <- TRUE
       pkg.globals$.jiraLastLoginChk <- Sys.time()
