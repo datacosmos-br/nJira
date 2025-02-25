@@ -13,14 +13,17 @@ pkg.globals$.jiraLastLoginChk <- Sys.time()
 pkg.globals$.issueFields <- ""
 pkg.globals$.logs <- FALSE
 
+# NEW: track if it's Jira Cloud
+pkg.globals$.jiraIsCloud <- FALSE
 
 #' Jira Login Function
 #'
 #' Authenticates the user to fetch data from the respective Jira installation.
+#' Automatically detects whether it's on-prem (Server/DC) or Cloud.
 #'
-#' @param jira.env Web address of 'Jira' environment (e.g. https://issues.apache.org/jira)
-#' @param jira.user Jira User Name
-#' @param jira.pwd Jira Password
+#' @param jira.env Web address of 'Jira' environment (e.g. https://issues.apache.org/jira or https://<your-domain>.atlassian.net)
+#' @param jira.user Jira User Name (email if Cloud)
+#' @param jira.pwd Jira Password (or API Token if Cloud)
 #' @param jira.val 0/1 how should the list values be returned in the query results
 #' @param logs debug logs required on not (Default = FALSE)
 #' @examples
@@ -49,22 +52,75 @@ jira.login <- function(jira.env = NULL, jira.user = NULL, jira.pwd = NULL, jira.
   # Return if blank value is passed in global variables
   if (pkg.globals$.jiraEnv == "") {return(.logTrace("You have not yet authenticated into Jira Environment using Jira.Login() function"))}
 
-  ## Check if live Jira session exists
+  ## 1) Try old on-prem approach: /rest/auth/1/session
   resp <- GET(paste(pkg.globals$.jiraEnv, "/rest/auth/1/session", sep = ""))
-  if(resp$status_code == 401) {
-    # Clear any previous issueFields cache
-    if (exists("pkg.globals$.issueFields")) {rm(pkg.globals$.issueFields)}
+  if (resp$status_code == 401) {
+    # Session inactive or expired. Attempt to POST credentials for on-prem
+    if (exists("pkg.globals$.issueFields")) {
+      rm(pkg.globals$.issueFields)
+    }
     .logTrace("Jira session inactive or expired. Sending login request")
-    resp <- POST(paste(pkg.globals$.jiraEnv, "/rest/auth/1/session", sep = ""), authenticate(pkg.globals$.jiraUser, pkg.globals$.jiraPwd), add_headers("Content-Type" = "application/json"))
-    if(resp$status_code == 400) {.logTrace("Jira Login Done"); pkg.globals$.jiraIsActive=TRUE; pkg.globals$.jiraLastLoginChk=Sys.time()} else {.logTrace("Jira Login Failed"); pkg.globals$.jiraIsActive=FALSE}
-  } else if(resp$status_code == 200) {.logTrace("Jira session active."); pkg.globals$.jiraIsActive=TRUE; pkg.globals$.jiraLastLoginChk=Sys.time()}
+    resp2 <- POST(
+      paste(pkg.globals$.jiraEnv, "/rest/auth/1/session", sep = ""), 
+      authenticate(pkg.globals$.jiraUser, pkg.globals$.jiraPwd),
+      add_headers("Content-Type" = "application/json")
+    )
+    if (resp2$status_code == 400) {
+      .logTrace("Jira Login Done (on-prem)")
+      pkg.globals$.jiraIsActive = TRUE
+      pkg.globals$.jiraLastLoginChk = Sys.time()
+    } else {
+      .logTrace("Jira Login Failed via on-prem session call; trying Cloud fallback")
+      pkg.globals$.jiraIsActive = FALSE
+      # Attempt Cloud
+      cloudCheck()
+    }
 
-  ## Cache the Jira Issue Fields that is used in various function
-  if (!exists("pkg.globals$.issueFields")) {
+  } else if (resp$status_code == 200) {
+    # Already have an active session or no auth needed
+    .logTrace("Jira session active (on-prem).")
+    pkg.globals$.jiraIsActive = TRUE
+    pkg.globals$.jiraLastLoginChk = Sys.time()
+
+  } else if (resp$status_code == 404) {
+    # Possibly Jira Cloud (the on-prem auth endpoint doesn't exist)
+    .logTrace("Got 404 from /rest/auth/1/session. Trying Cloud fallback.")
+    pkg.globals$.jiraIsActive = FALSE
+    cloudCheck()
+
+  } else {
+    # Some other code. Could be older on-prem or Cloud. We'll do a fallback anyway
+    .logTrace(paste("Unexpected status code", resp$status_code, "from /rest/auth/1/session. Attempting Cloud fallback."))
+    pkg.globals$.jiraIsActive = FALSE
+    cloudCheck()
+  }
+
+  # If active, load the fields if not loaded
+  if (pkg.globals$.jiraIsActive && !exists("pkg.globals$.issueFields")) {
     pkg.globals$.issueFields <- .jira.issues.fields()
     .logTrace("Jira fields cached", pr = FALSE)
   }
 }
+
+# Minimal helper to check Cloud
+cloudCheck <- function() {
+  testUrl <- paste0(pkg.globals$.jiraEnv, "/rest/api/2/myself")
+  respC <- GET(
+    testUrl,
+    authenticate(pkg.globals$.jiraUser, pkg.globals$.jiraPwd, type = "basic"),
+    add_headers("Content-Type" = "application/json")
+  )
+  if (respC$status_code == 200) {
+    .logTrace("Jira Cloud detected (Basic Auth success).", pr=FALSE)
+    pkg.globals$.jiraIsCloud = TRUE
+    pkg.globals$.jiraIsActive = TRUE
+    pkg.globals$.jiraLastLoginChk = Sys.time()
+  } else {
+    .logTrace("Jira Login Failed (Cloud fallback).", pr=FALSE)
+    pkg.globals$.jiraIsActive = FALSE
+  }
+}
+
 
 #' Jira Tables and Field Details
 #'
