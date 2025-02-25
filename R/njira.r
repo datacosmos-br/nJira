@@ -27,30 +27,33 @@ pkg.globals$.jiraIsCloud <- FALSE
 #' @param jira.val 0/1 how should the list values be returned in the query results
 #' @param logs debug logs required on not (Default = FALSE)
 #' @examples
-#' jira.login(jira.env="https://issues.apache.org/jira", 
-#' jira.user="jiraTestUser", jira.pwd="jiraTestPwd")
-#' 
+#' jira.login(
+#'   jira.env = "https://issues.apache.org/jira",
+#'   jira.user = "jiraTestUser", jira.pwd = "jiraTestPwd"
+#' )
+#'
 #' @return The function authenticates the user into Jira installation and caches the Jira credentials.
 
 jira.login <- function(jira.env = NULL, jira.user = NULL, jira.pwd = NULL, jira.val = 0, logs = FALSE) {
-  
   options(warn = -1)
-  
-  if (pkg.globals$.jiraIsActive & difftime(Sys.time(), pkg.globals$.jiraLastLoginChk, units="sec") < 2) {
-    .logTrace("Jira.login() function used again in less than two second with an active connection", pr=FALSE)
+
+  if (pkg.globals$.jiraIsActive & difftime(Sys.time(), pkg.globals$.jiraLastLoginChk, units = "sec") < 2) {
+    .logTrace("Jira.login() function used again in less than two second with an active connection", pr = FALSE)
     pkg.globals$.jiraLastLoginChk <- Sys.time()
     return()
   }
-  
-  # Connection parameters  
+
+  # Connection parameters
   pkg.globals$.jiraEnv <- jira.env
   pkg.globals$.jiraUser <- jira.user
   pkg.globals$.jiraPwd <- jira.pwd
   pkg.globals$.jiraVal <- jira.val
   pkg.globals$.logs <- logs
-  
+
   # Return if blank value is passed in global variables
-  if (pkg.globals$.jiraEnv == "") {return(.logTrace("You have not yet authenticated into Jira Environment using Jira.Login() function"))}
+  if (pkg.globals$.jiraEnv == "") {
+    return(.logTrace("You have not yet authenticated into Jira Environment using Jira.Login() function"))
+  }
 
   ## 1) Try old on-prem approach: /rest/auth/1/session
   resp <- GET(paste(pkg.globals$.jiraEnv, "/rest/auth/1/session", sep = ""))
@@ -61,37 +64,34 @@ jira.login <- function(jira.env = NULL, jira.user = NULL, jira.pwd = NULL, jira.
     }
     .logTrace("Jira session inactive or expired. Sending login request")
     resp2 <- POST(
-      paste(pkg.globals$.jiraEnv, "/rest/auth/1/session", sep = ""), 
+      paste(pkg.globals$.jiraEnv, "/rest/auth/1/session", sep = ""),
       authenticate(pkg.globals$.jiraUser, pkg.globals$.jiraPwd),
       add_headers("Content-Type" = "application/json")
     )
     if (resp2$status_code == 400) {
       .logTrace("Jira Login Done (on-prem)")
-      pkg.globals$.jiraIsActive = TRUE
-      pkg.globals$.jiraLastLoginChk = Sys.time()
+      pkg.globals$.jiraIsActive <- TRUE
+      pkg.globals$.jiraLastLoginChk <- Sys.time()
     } else {
       .logTrace("Jira Login Failed via on-prem session call; trying Cloud fallback")
-      pkg.globals$.jiraIsActive = FALSE
+      pkg.globals$.jiraIsActive <- FALSE
       # Attempt Cloud
       cloudCheck()
     }
-
   } else if (resp$status_code == 200) {
     # Already have an active session or no auth needed
     .logTrace("Jira session active (on-prem).")
-    pkg.globals$.jiraIsActive = TRUE
-    pkg.globals$.jiraLastLoginChk = Sys.time()
-
+    pkg.globals$.jiraIsActive <- TRUE
+    pkg.globals$.jiraLastLoginChk <- Sys.time()
   } else if (resp$status_code == 404) {
     # Possibly Jira Cloud (the on-prem auth endpoint doesn't exist)
     .logTrace("Got 404 from /rest/auth/1/session. Trying Cloud fallback.")
-    pkg.globals$.jiraIsActive = FALSE
+    pkg.globals$.jiraIsActive <- FALSE
     cloudCheck()
-
   } else {
     # Some other code. Could be older on-prem or Cloud. We'll do a fallback anyway
     .logTrace(paste("Unexpected status code", resp$status_code, "from /rest/auth/1/session. Attempting Cloud fallback."))
-    pkg.globals$.jiraIsActive = FALSE
+    pkg.globals$.jiraIsActive <- FALSE
     cloudCheck()
   }
 
@@ -111,13 +111,13 @@ cloudCheck <- function() {
     add_headers("Content-Type" = "application/json")
   )
   if (respC$status_code == 200) {
-    .logTrace("Jira Cloud detected (Basic Auth success).", pr=FALSE)
-    pkg.globals$.jiraIsCloud = TRUE
-    pkg.globals$.jiraIsActive = TRUE
-    pkg.globals$.jiraLastLoginChk = Sys.time()
+    .logTrace("Jira Cloud detected (Basic Auth success).", pr = FALSE)
+    pkg.globals$.jiraIsCloud <- TRUE
+    pkg.globals$.jiraIsActive <- TRUE
+    pkg.globals$.jiraLastLoginChk <- Sys.time()
   } else {
-    .logTrace("Jira Login Failed (Cloud fallback).", pr=FALSE)
-    pkg.globals$.jiraIsActive = FALSE
+    .logTrace("Jira Login Failed (Cloud fallback).", pr = FALSE)
+    pkg.globals$.jiraIsActive <- FALSE
   }
 }
 
@@ -134,7 +134,7 @@ cloudCheck <- function() {
 #' fields <- jira.metadata(table = "history")
 #' fields <- jira.metadata(table = "issues")
 #' fields <- jira.metadata(table = "issues", fields = c("Created", "Date Required", "Dev Status"))
-#' 
+#'
 #' @return Data frame of Jira tables and field names.
 
 jira.metadata <- function(table = NULL, fields = NULL) {
@@ -144,9 +144,9 @@ jira.metadata <- function(table = NULL, fields = NULL) {
 
 #' Jira Query Interface
 #'
-#' Query Jira using SQL like query syntax. 
+#' Query Jira using SQL like query syntax.
 #' The query response from Jira REST API is returned as a dataframe.
-#' 
+#'
 #' For querying Jira 'history' table, the where clause must specify issue 'id' \cr
 #' Example : \code{where = "id = 'HIVE-22692'"}
 #'
@@ -155,47 +155,59 @@ jira.metadata <- function(table = NULL, fields = NULL) {
 #' @param where specifies the where clause of the query. You can also pass your Jira JQL as-is in the where clause.
 #' @param groupby specifies the list of fields on which the data is grouped.
 #' @examples
-#' issues <- jira.query(table = "issues", fields = "id AS IssueId, Created, Status, Priority", 
-#' where = "project = 'HIVE' AND created >= '2019-01-01' AND created <= '2019-12-31' AND 
-#' Status IN ('Open', 'Closed', 'Resolved')")
+#' issues <- jira.query(
+#'   table = "issues", fields = "id AS IssueId, Created, Status, Priority",
+#'   where = "project = 'HIVE' AND created >= '2019-01-01' AND created <= '2019-12-31' AND
+#' Status IN ('Open', 'Closed', 'Resolved')"
+#' )
 #'
-#' issues <- jira.query(table = "issues", fields = "id AS IssueId, Created", 
-#' where = "'cf[10021]' = 'ABCD' AND Created > '2019-01-01'")
+#' issues <- jira.query(
+#'   table = "issues", fields = "id AS IssueId, Created",
+#'   where = "'cf[10021]' = 'ABCD' AND Created > '2019-01-01'"
+#' )
 #'
 #' history <- jira.query(table = "history", where = "id = 'HIVE-22692'")
 #'
-#' history <- jira.query(table = "history", fields = "id AS IssueId, toString AS Status, 
-#' COUNT(fromString) AS Count", where = "id = 'HIVE-22692' AND field = 'status'", 
-#' groupby = "id,toString")
-#' 
+#' history <- jira.query(
+#'   table = "history", fields = "id AS IssueId, toString AS Status,
+#' COUNT(fromString) AS Count", where = "id = 'HIVE-22692' AND field = 'status'",
+#'   groupby = "id,toString"
+#' )
+#'
 #' @return Data frame of results returned by the Jira query.
 
 jira.query <- function(table, fields = NULL, where = NULL, groupby = NULL) {
   jira.login(pkg.globals$.jiraEnv, pkg.globals$.jiraUser, pkg.globals$.jiraPwd, pkg.globals$.jiraVal)
   result <- data.frame()
   if (table == "issues") {
-    if (is.null(where) ) {
+    if (is.null(where)) {
       stop("The where clause condition is mandatory to fetch data from Jira 'issues' table")
     }
-    if (is.null(fields)) {flds = "ALL"} else {flds <- gsub("'", "", rk.fields(fields, mode = ""))}
+    if (is.null(fields)) {
+      flds <- "ALL"
+    } else {
+      flds <- gsub("'", "", rk.fields(fields, mode = ""))
+    }
     result <- .jira.search.issue(query = rk.where(where, "~"), fields = flds, maxresults = 10000000)
     if (nrow(result) & !is.null(fields)) {
       if (flds != "ALL") {
         ## Renme column names as the Jira query function changes the user supplied field names into alias names from Jira and it would not work with rk.query
         nord <- .jira.fields.map(unlist(strsplit(flds, ",")), toAlias = TRUE)
         ### (to be removed) Incase if some selective fields in the query are not returned in the result, we add the corrosponding column names with null value
-          l <- nord[!nord %in% names(result)]
-          if (length(l) > 0) {
-           tmpdf <- data.frame(matrix(ncol=length(l), nrow = nrow(result)))
-           names(tmpdf) <- l
-           tmpdf[is.na(tmpdf)] <- "NULL"
-           result <- cbind(result, tmpdf)
-          }
+        l <- nord[!nord %in% names(result)]
+        if (length(l) > 0) {
+          tmpdf <- data.frame(matrix(ncol = length(l), nrow = nrow(result)))
+          names(tmpdf) <- l
+          tmpdf[is.na(tmpdf)] <- "NULL"
+          result <- cbind(result, tmpdf)
+        }
         ####
         result <- result[, nord]
         names(result) <- strsplit(flds, ",")[[1]]
         ##
-        if (nrow(result) > 0) {result <- rk.query(result, fields, where = NULL, groupby)}
+        if (nrow(result) > 0) {
+          result <- rk.query(result, fields, where = NULL, groupby)
+        }
       }
     }
 
@@ -208,14 +220,17 @@ jira.query <- function(table, fields = NULL, where = NULL, groupby = NULL) {
     }
     qwhere <- rk.where(where, "=", .jira.searchable(table))
     id <- unlist(strsplit(rk.where(where, "=", .jira.searchable(table)), "="))[2]
-    if (table == "history")
+    if (table == "history") {
       result <- .jira.issue.changelog(id)
-    else
+    } else {
       result <- .jira.issue.comments(id)
+    }
 
     n <- attr(k, "match.length")
     where <- substr(where, n + 1, nchar(where))
-    if (nrow(result)) {result <- rk.query(result, fields, where = where, groupby)}
+    if (nrow(result)) {
+      result <- rk.query(result, fields, where = where, groupby)
+    }
     return(result)
   }
 }

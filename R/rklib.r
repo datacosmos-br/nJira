@@ -5,18 +5,21 @@
 
 # function for logging
 .logTrace <- function(msg = NULL, pr = TRUE, fl = NULL) {
-
-  if(pr) {print(paste(.tStamp(), ":", msg))}
+  if (pr) {
+    print(paste(.tStamp(), ":", msg))
+  }
   if (pkg.globals$.logs) {
     if (is.null(fl)) {
-      fldr = paste(getwd(), "Logs", sep = "/")
-      if (!dir.exists(fldr)) {dir.create(fldr, recursive = TRUE)}
-      fl = paste(fldr, "/nJira_log_", format(Sys.time(), "%d-%m-%y.txt"), sep = "")
+      fldr <- paste(getwd(), "Logs", sep = "/")
+      if (!dir.exists(fldr)) {
+        dir.create(fldr, recursive = TRUE)
+      }
+      fl <- paste(fldr, "/nJira_log_", format(Sys.time(), "%d-%m-%y.txt"), sep = "")
     }
-  
+
     if (!file.exists(fl)) {
       file.create(fl)
-      write.table(paste(.tStamp(), ": This package provides a SQL query like interface to fetch data from JIRA (using JIRA REST API)"),fl, append = TRUE, row.names = FALSE, col.names = FALSE, sep = "")
+      write.table(paste(.tStamp(), ": This package provides a SQL query like interface to fetch data from JIRA (using JIRA REST API)"), fl, append = TRUE, row.names = FALSE, col.names = FALSE, sep = "")
     }
     write.table(paste(.tStamp(), ":", msg), fl, append = TRUE, row.names = FALSE, col.names = FALSE, sep = "")
   }
@@ -40,18 +43,20 @@
 rk.metadata <- function(table = NULL, fields = NULL, gettabs, getflds, infofile = NULL) {
   tabfld <- data.frame(Table = character(0), Field = character(0), stringsAsFactors = FALSE)
 
-  if (!is.null(table) && length(table) > 1)
+  if (!is.null(table) && length(table) > 1) {
     stop("Table parameter accepts a single table name")
+  }
 
   if (is.null(fields)) {
     # List down all the fields of the specified table(s)
 
     k <- 1
-    if (is.null(table))
+    if (is.null(table)) {
       table <- gettabs()
+    }
     for (tab in table) {
       for (fld in getflds(tab)) {
-        tabfld[k,] <- c(tab, fld)
+        tabfld[k, ] <- c(tab, fld)
         k <- k + 1
       }
     }
@@ -62,11 +67,12 @@ rk.metadata <- function(table = NULL, fields = NULL, gettabs, getflds, infofile 
 
     k <- 1
     tfields <- getflds(table)
-    if (length(fields))
+    if (length(fields)) {
       for (fld in intersect(fields, tfields)) {
-        tabfld[k,] <- c(table, fld)
+        tabfld[k, ] <- c(table, fld)
         k <- k + 1
       }
+    }
   }
 
   if (nrow(tabfld) && !is.null(infofile)) {
@@ -75,8 +81,8 @@ rk.metadata <- function(table = NULL, fields = NULL, gettabs, getflds, infofile 
       mdata <- read.csv(fname)
 
       tabfld <- merge(tabfld, mdata, by = c("Table", "Field"), all.x = TRUE)
-      tabfld[is.na(tabfld$Type),]$Type <- "Str"
-      tabfld[is.na(tabfld$Format),]$Format <- ""
+      tabfld[is.na(tabfld$Type), ]$Type <- "Str"
+      tabfld[is.na(tabfld$Format), ]$Format <- ""
     } else {
       .logTrace(paste("Metadata description file doesn't exist -", fname), pr = FALSE)
     }
@@ -90,9 +96,9 @@ rk.metadata <- function(table = NULL, fields = NULL, gettabs, getflds, infofile 
 #' The function parses the fields clause and returns the modified string as per the specified mode.
 #' The fields clause supported format is represented by the following BNF:
 #' \preformatted{
-#'	<field.list> := <field.expr> ( DELIMIT.COMMA <field.expr> ) *
-#'	<field.expr> := ( FIELD.NAME | <aggr.func> LEFT.PAREN FIELD.NAME RIGHT.PAREN ) [ AS.ALIAS FIELD.NAME ]
-#'	<aggr.func> := FUNC.MIN | FUNC.MEDIAN | FUNC.AVG | FUNC.MAX | FUNC.COUNT | FUNC.SUM
+#' 	<field.list> := <field.expr> ( DELIMIT.COMMA <field.expr> ) *
+#' 	<field.expr> := ( FIELD.NAME | <aggr.func> LEFT.PAREN FIELD.NAME RIGHT.PAREN ) [ AS.ALIAS FIELD.NAME ]
+#' 	<aggr.func> := FUNC.MIN | FUNC.MEDIAN | FUNC.AVG | FUNC.MAX | FUNC.COUNT | FUNC.SUM
 #' }
 #' @param fields clause following simplified sql syntax.
 #' @param mode specifies the parsing logic. The default value '@' returns the field list in perfmeter query format. The '+' value returns a field list used for grouping the dataframe with alias names. The '=' value returns a field list used for grouping the dataframe with original names. The '*' value returns the alias list used for renaming the columns. Any other value returns a field list used for selecting columns from a dataframe.
@@ -104,22 +110,27 @@ rk.fields <- function(fields, mode = "@") {
 
   fields <- unlist(strsplit(fields, ","))
   for (fld in fields) {
-    if ((sfld <- sub("^\\s*([\\w\\.]+|'((?:.(?!(?<![\\\\])'))*.?)')\\s*$", "~,\\1,~", fld, ignore.case = TRUE, perl = TRUE)) == fld)
-      if ((sfld <- sub("^\\s*([\\w\\.]+|'((?:.(?!(?<![\\\\])'))*.?)')\\s+AS\\s+([\\w\\.]+|'((?:.(?!(?<![\\\\])'))*.?)')\\s*$", "~,\\1,\\3", fld, ignore.case = TRUE, perl = TRUE)) == fld)
-        if ((sfld <- sub("^\\s*(MIN|MEDIAN|AVG|MAX|COUNT|SUM)\\(\\s*([\\w\\.]+|'((?:.(?!(?<![\\\\])'))*.?)')\\s*\\)\\s*$", "\\1,\\2,~", fld, ignore.case = TRUE, perl = TRUE)) == fld)
-          if ((sfld <- sub("^\\s*(MIN|MEDIAN|AVG|MAX|COUNT|SUM)\\(\\s*([\\w\\.]+|'((?:.(?!(?<![\\\\])'))*.?)')\\s*\\)\\s+AS\\s+([\\w\\.]+|'((?:.(?!(?<![\\\\])'))*.?)')\\s*$", "\\1,\\2,\\4", fld, ignore.case = TRUE, perl = TRUE)) == fld)
+    if ((sfld <- sub("^\\s*([\\w\\.]+|'((?:.(?!(?<![\\\\])'))*.?)')\\s*$", "~,\\1,~", fld, ignore.case = TRUE, perl = TRUE)) == fld) {
+      if ((sfld <- sub("^\\s*([\\w\\.]+|'((?:.(?!(?<![\\\\])'))*.?)')\\s+AS\\s+([\\w\\.]+|'((?:.(?!(?<![\\\\])'))*.?)')\\s*$", "~,\\1,\\3", fld, ignore.case = TRUE, perl = TRUE)) == fld) {
+        if ((sfld <- sub("^\\s*(MIN|MEDIAN|AVG|MAX|COUNT|SUM)\\(\\s*([\\w\\.]+|'((?:.(?!(?<![\\\\])'))*.?)')\\s*\\)\\s*$", "\\1,\\2,~", fld, ignore.case = TRUE, perl = TRUE)) == fld) {
+          if ((sfld <- sub("^\\s*(MIN|MEDIAN|AVG|MAX|COUNT|SUM)\\(\\s*([\\w\\.]+|'((?:.(?!(?<![\\\\])'))*.?)')\\s*\\)\\s+AS\\s+([\\w\\.]+|'((?:.(?!(?<![\\\\])'))*.?)')\\s*$", "\\1,\\2,\\4", fld, ignore.case = TRUE, perl = TRUE)) == fld) {
             stop(paste("Invalid field expression '", sub("^\\s*", "", sub("\\s*$", "", fld)), "' specified", sep = ""))
+          }
+        }
+      }
+    }
 
     toks <- unlist(strsplit(sfld, ","))
     if (mode == "@") {
       s <- paste("@", toks[2], sep = "")
-      if (toks[1] != "~")
+      if (toks[1] != "~") {
         s <- paste(toupper(toks[1]), "(", s, ")", sep = "")
+      }
       mfields <- paste(mfields, ifelse(mcomma, ",", ""), s, sep = "")
       mcomma <- TRUE
     } else if (mode == "+" || mode == "=") {
       if (toks[1] != "~") {
-        toks[1] = tolower(toks[1])
+        toks[1] <- tolower(toks[1])
         if (toks[1] == "avg") toks[1] <- "mean"
         if (toks[1] == "count") toks[1] <- "length"
         mfields <- paste(mfields, ifelse(mcomma, ",", ""), ifelse(mode == "=" || toks[3] == "~", toks[2], toks[3]), " = ", toks[1], "(", toks[2], ")", sep = "")
@@ -127,14 +138,16 @@ rk.fields <- function(fields, mode = "@") {
       }
     } else if (mode == "*") {
       id <- ifelse(toks[3] == "~", toks[2], toks[3])
-      if (substr(id, 1, 1) == "'" && substr(id, nchar(id), nchar(id)) == "'")
+      if (substr(id, 1, 1) == "'" && substr(id, nchar(id), nchar(id)) == "'") {
         id <- substr(id, 2, nchar(id) - 1)
+      }
       mfields <- paste(mfields, ifelse(mcomma, ",", ""), id, sep = "")
       mcomma <- TRUE
     } else {
       id <- toks[2]
-      if (substr(id, 1, 1) == "'" && substr(id, nchar(id), nchar(id)) == "'")
+      if (substr(id, 1, 1) == "'" && substr(id, nchar(id), nchar(id)) == "'") {
         id <- substr(id, 2, nchar(id) - 1)
+      }
       mfields <- paste(mfields, ifelse(mcomma, ",", ""), "'", id, "'", sep = "")
       mcomma <- TRUE
     }
@@ -148,14 +161,14 @@ rk.fields <- function(fields, mode = "@") {
 #' The function parses the where clause and returns the modified string as per the specified mode.
 #' The where clause supported format is represented by the following BNF:
 #' \preformatted{
-#'	<where.cond> := <where.and> [ LOGICAL.OR <where.cond> ]
-#'	<where.and> := <where.not> [ LOGICAL.AND <where.and> ]
-#'	<where.not> := [ LOGICAL.NOT ] <where.clause>
-#'	<where.clause> := LEFT.PAREN <where.cond> RIGHT.PAREN | <where.expr>
-#'	<where.expr> := ( IDENTIFIER | QUOTE.STR ) ( [ LOGICAL.NOT ] ( OPERATOR.IN <value.list> | OPERATOR.LIKE <value.const> ) | OPERATOR.IS [ LOGICAL.NOT ] VALUE.NULL | <logic.cond> )
-#'	<logic.cond> := ( EQUAL.TO | NOT.EQUAL | LESS.THAN | GREATER.THAN | LESS.EQUAL | GREATER.EQUAL ) <value.const>
-#'	<value.list> := LEFT.PAREN <value.const> ( DELIMIT.COMMA <value.const> ) * RIGHT.PAREN
-#'	<value.const> := | QUOTE.STR | NUMBER
+#' 	<where.cond> := <where.and> [ LOGICAL.OR <where.cond> ]
+#' 	<where.and> := <where.not> [ LOGICAL.AND <where.and> ]
+#' 	<where.not> := [ LOGICAL.NOT ] <where.clause>
+#' 	<where.clause> := LEFT.PAREN <where.cond> RIGHT.PAREN | <where.expr>
+#' 	<where.expr> := ( IDENTIFIER | QUOTE.STR ) ( [ LOGICAL.NOT ] ( OPERATOR.IN <value.list> | OPERATOR.LIKE <value.const> ) | OPERATOR.IS [ LOGICAL.NOT ] VALUE.NULL | <logic.cond> )
+#' 	<logic.cond> := ( EQUAL.TO | NOT.EQUAL | LESS.THAN | GREATER.THAN | LESS.EQUAL | GREATER.EQUAL ) <value.const>
+#' 	<value.list> := LEFT.PAREN <value.const> ( DELIMIT.COMMA <value.const> ) * RIGHT.PAREN
+#' 	<value.const> := | QUOTE.STR | NUMBER
 #' }
 #' @param where clause following simplified sql syntax.
 #' @param mode specifies the parsing logic. The default value '@' returns the where clause in perfmeter format. The '=' value returns the where clause in IOD format. The '~' value returns the where clause in Jira format. The '' (empty string) value returns a where clause used with a sql statement. If a dataframe name is passed, the function returns the where clause for use with a dataframe.
@@ -163,7 +176,9 @@ rk.fields <- function(fields, mode = "@") {
 #' @return The function returns the processed where clause.
 
 rk.where <- function(where = NULL, mode = "@", fields = NULL) {
-  if (is.null(where) || !nchar(where)) return("")
+  if (is.null(where) || !nchar(where)) {
+    return("")
+  }
 
   e <- new.env()
 
@@ -175,30 +190,30 @@ rk.where <- function(where = NULL, mode = "@", fields = NULL) {
 
   ntok <- 0
   retok <- c()
-  retok[LOGICAL.OR	<- (ntok <- ntok + 1)] <- "^OR(?!\\w)"
-  retok[LOGICAL.AND	<- (ntok <- ntok + 1)] <- "^AND(?!\\w)"
-  retok[LOGICAL.NOT	<- (ntok <- ntok + 1)] <- "^NOT(?!\\w)"
-  retok[OPERATOR.IN	<- (ntok <- ntok + 1)] <- "^IN(?!\\w)"
-  retok[OPERATOR.LIKE	<- (ntok <- ntok + 1)] <- "^LIKE(?!\\w)"
-  retok[OPERATOR.IS	<- (ntok <- ntok + 1)] <- "^IS(?!\\w)"
-  retok[VALUE.NULL	<- (ntok <- ntok + 1)] <- "^NULL(?!\\w)"
-  retok[NUMBER		<- (ntok <- ntok + 1)] <- "^[\\d\\.]+"
-  retok[IDENTIFIER	<- (ntok <- ntok + 1)] <- "^[\\w\\.]+"
-  retok[QUOTE.STR		<- (ntok <- ntok + 1)] <- "^'((?:.(?!(?<![\\\\])'))*.?)'"
-  retok[LEFT.PAREN	<- (ntok <- ntok + 1)] <- "^\\("
-  retok[RIGHT.PAREN	<- (ntok <- ntok + 1)] <- "^\\)"
-  retok[DELIMIT.COMMA	<- (ntok <- ntok + 1)] <- "^,"
-  retok[GREATER.EQUAL	<- (ntok <- ntok + 1)] <- "^>="
-  retok[LESS.EQUAL	<- (ntok <- ntok + 1)] <- "^<="
-  retok[NOT.EQUAL		<- (ntok <- ntok + 1)] <- "^<>|^!="
-  retok[LESS.THAN		<- (ntok <- ntok + 1)] <- "^<"
-  retok[GREATER.THAN	<- (ntok <- ntok + 1)] <- "^>"
-  retok[EQUAL.TO		<- (ntok <- ntok + 1)] <- "^="
-  retok[END.OF.EXPR	<- (ntok <- ntok + 1)] <- "^"
+  retok[LOGICAL.OR <- (ntok <- ntok + 1)] <- "^OR(?!\\w)"
+  retok[LOGICAL.AND <- (ntok <- ntok + 1)] <- "^AND(?!\\w)"
+  retok[LOGICAL.NOT <- (ntok <- ntok + 1)] <- "^NOT(?!\\w)"
+  retok[OPERATOR.IN <- (ntok <- ntok + 1)] <- "^IN(?!\\w)"
+  retok[OPERATOR.LIKE <- (ntok <- ntok + 1)] <- "^LIKE(?!\\w)"
+  retok[OPERATOR.IS <- (ntok <- ntok + 1)] <- "^IS(?!\\w)"
+  retok[VALUE.NULL <- (ntok <- ntok + 1)] <- "^NULL(?!\\w)"
+  retok[NUMBER <- (ntok <- ntok + 1)] <- "^[\\d\\.]+"
+  retok[IDENTIFIER <- (ntok <- ntok + 1)] <- "^[\\w\\.]+"
+  retok[QUOTE.STR <- (ntok <- ntok + 1)] <- "^'((?:.(?!(?<![\\\\])'))*.?)'"
+  retok[LEFT.PAREN <- (ntok <- ntok + 1)] <- "^\\("
+  retok[RIGHT.PAREN <- (ntok <- ntok + 1)] <- "^\\)"
+  retok[DELIMIT.COMMA <- (ntok <- ntok + 1)] <- "^,"
+  retok[GREATER.EQUAL <- (ntok <- ntok + 1)] <- "^>="
+  retok[LESS.EQUAL <- (ntok <- ntok + 1)] <- "^<="
+  retok[NOT.EQUAL <- (ntok <- ntok + 1)] <- "^<>|^!="
+  retok[LESS.THAN <- (ntok <- ntok + 1)] <- "^<"
+  retok[GREATER.THAN <- (ntok <- ntok + 1)] <- "^>"
+  retok[EQUAL.TO <- (ntok <- ntok + 1)] <- "^="
+  retok[END.OF.EXPR <- (ntok <- ntok + 1)] <- "^"
 
   iod <- mode == "="
   jira <- mode == "~"
-  sql <- mode == "@" || mode == "~" ||  mode == ""
+  sql <- mode == "@" || mode == "~" || mode == ""
 
   generate.tokens <- function() {
     # Remove trailing spaces
@@ -210,12 +225,15 @@ rk.where <- function(where = NULL, mode = "@", fields = NULL) {
 
       where <- sub("^\\s+", "", where)
 
-      for (n in 1:ntok)
-        if ((k <- regexpr(retok[n], where, ignore.case = TRUE, perl = TRUE)) > 0)
+      for (n in 1:ntok) {
+        if ((k <- regexpr(retok[n], where, ignore.case = TRUE, perl = TRUE)) > 0) {
           break
+        }
+      }
 
-      if (n == END.OF.EXPR)
+      if (n == END.OF.EXPR) {
         stop(paste("Invalid where sub-clause at '", where, "'", sep = ""))
+      }
 
       e$toks <- c(e$toks, n)
       n <- attr(k, "match.length")
@@ -234,12 +252,15 @@ rk.where <- function(where = NULL, mode = "@", fields = NULL) {
     if (e$toks[e$k] == LOGICAL.OR) {
       e$k <- e$k + 1
       r <- where.cond()
-      if (iod)
+      if (iod) {
         return("")
-      if (!nchar(s))
+      }
+      if (!nchar(s)) {
         return(r)
-      if (!nchar(r))
+      }
+      if (!nchar(r)) {
         return(s)
+      }
       return(paste(s, ifelse(sql, "OR", "|"), r))
     }
     return(s)
@@ -250,10 +271,12 @@ rk.where <- function(where = NULL, mode = "@", fields = NULL) {
     if (e$toks[e$k] == LOGICAL.AND) {
       e$k <- e$k + 1
       r <- where.and()
-      if (!nchar(s))
+      if (!nchar(s)) {
         return(r)
-      if (!nchar(r))
+      }
+      if (!nchar(r)) {
         return(s)
+      }
       return(paste(s, ifelse(sql, "AND", "&"), r))
     }
     return(s)
@@ -272,8 +295,9 @@ rk.where <- function(where = NULL, mode = "@", fields = NULL) {
     if (e$toks[e$k] == LEFT.PAREN) {
       e$k <- e$k + 1
       s <- where.cond()
-      if (e$toks[e$k] != RIGHT.PAREN)
+      if (e$toks[e$k] != RIGHT.PAREN) {
         stop(paste("Missing right parenthesis after '", s, "' at token number ", e$k, sep = ""))
+      }
       e$k <- e$k + 1
       return(ifelse(!nchar(s), "", ifelse(iod, s, paste("(", s, ")", sep = ""))))
     }
@@ -282,8 +306,9 @@ rk.where <- function(where = NULL, mode = "@", fields = NULL) {
   }
 
   where.expr <- function() {
-    if (e$toks[e$k] != IDENTIFIER && e$toks[e$k] != QUOTE.STR)
+    if (e$toks[e$k] != IDENTIFIER && e$toks[e$k] != QUOTE.STR) {
       stop(paste("Expecting identifier and got '", e$tokv[e$k], "' at token number ", e$k, sep = ""))
+    }
 
     eskip <- !is.null(fields) && !e$tokv[e$k] %in% fields
 
@@ -291,17 +316,20 @@ rk.where <- function(where = NULL, mode = "@", fields = NULL) {
     e$k <- e$k + 1
 
     if (e$toks[e$k] == LOGICAL.NOT || e$toks[e$k] == OPERATOR.IN || e$toks[e$k] == OPERATOR.LIKE) {
-      if (not <- e$toks[e$k] == LOGICAL.NOT)
+      if (not <- e$toks[e$k] == LOGICAL.NOT) {
         e$k <- e$k + 1
+      }
 
       if (e$toks[e$k] == OPERATOR.IN) {
         e$k <- e$k + 1
 
         s <- value.list(id)
-        if (iod)
+        if (iod) {
           return("")
-        if (sql)
+        }
+        if (sql) {
           return(ifelse(eskip, "", paste(id, ifelse(not, " NOT", ""), " IN ", s, sep = "")))
+        }
         s <- paste(id, " %in% c", s, sep = "")
         return(ifelse(eskip, "", ifelse(not, paste("!(", s, ")", sep = ""), s)))
       }
@@ -310,10 +338,12 @@ rk.where <- function(where = NULL, mode = "@", fields = NULL) {
         e$k <- e$k + 1
 
         s <- value.const(id)
-        if (iod)
+        if (iod) {
           return("")
-        if (sql)
+        }
+        if (sql) {
           return(ifelse(eskip, "", paste(id, ifelse(not, " NOT", ""), " ", ifelse(jira, "~", "LIKE"), " ", s, sep = "")))
+        }
         return(ifelse(eskip, "", paste(ifelse(not, "!", ""), "grep(", s, ", ", id, ", perl = TRUE)", sep = "")))
       }
 
@@ -323,16 +353,19 @@ rk.where <- function(where = NULL, mode = "@", fields = NULL) {
     if (e$toks[e$k] == OPERATOR.IS) {
       e$k <- e$k + 1
 
-      if (not <- e$toks[e$k] == LOGICAL.NOT)
+      if (not <- e$toks[e$k] == LOGICAL.NOT) {
         e$k <- e$k + 1
+      }
 
       if (e$toks[e$k] == VALUE.NULL) {
         e$k <- e$k + 1
 
-        if (iod)
+        if (iod) {
           return("")
-        if (sql)
+        }
+        if (sql) {
           return(ifelse(eskip, "", paste(id, " IS", ifelse(not, " NOT", ""), " NULL", sep = "")))
+        }
         return(ifelse(eskip, "", paste(ifelse(not, "!", ""), "is.na(", id, ")", sep = "")))
       }
 
@@ -345,12 +378,13 @@ rk.where <- function(where = NULL, mode = "@", fields = NULL) {
 
   logic.cond <- function(id) {
     tok <- e$toks[e$k]
-    if (tok == EQUAL.TO)
+    if (tok == EQUAL.TO) {
       op <- ifelse(sql || iod, "=", "==")
-    else if (tok == NOT.EQUAL || tok == LESS.THAN || tok == GREATER.THAN || tok == LESS.EQUAL || tok == GREATER.EQUAL)
+    } else if (tok == NOT.EQUAL || tok == LESS.THAN || tok == GREATER.THAN || tok == LESS.EQUAL || tok == GREATER.EQUAL) {
       op <- e$tokv[e$k]
-    else
+    } else {
       stop(paste("Missing logical condition for identifier '", id, "' at token number ", e$k, sep = ""))
+    }
     e$k <- e$k + 1
 
     s <- value.const(id)
@@ -358,8 +392,9 @@ rk.where <- function(where = NULL, mode = "@", fields = NULL) {
   }
 
   value.list <- function(id) {
-    if (e$toks[e$k] != LEFT.PAREN)
+    if (e$toks[e$k] != LEFT.PAREN) {
       stop(paste("Missing left parenthesis for the 'IN' value list of identifier '", id, "' at token number ", e$k, sep = ""))
+    }
     e$k <- e$k + 1
 
     s <- paste("(", value.const(id), sep = "")
@@ -369,8 +404,9 @@ rk.where <- function(where = NULL, mode = "@", fields = NULL) {
       s <- paste(s, ",", value.const(id), sep = "")
     }
 
-    if (e$toks[e$k] != RIGHT.PAREN)
+    if (e$toks[e$k] != RIGHT.PAREN) {
       stop(paste("Missing right parenthesis for the 'IN' value list of identifier '", id, "' at token number ", e$k, sep = ""))
+    }
     e$k <- e$k + 1
 
     return(paste(s, ")", sep = ""))
@@ -390,8 +426,9 @@ rk.where <- function(where = NULL, mode = "@", fields = NULL) {
   generate.tokens()
   s <- where.cond()
 
-  if (e$toks[e$k] != END.OF.EXPR)
+  if (e$toks[e$k] != END.OF.EXPR) {
     stop(paste("Unexpected token '", e$tokv[e$k], "' at token number ", e$k, sep = ""))
+  }
 
   return(ifelse(iod, gsub("\\s", "", s), s))
 }
@@ -405,22 +442,26 @@ rk.where <- function(where = NULL, mode = "@", fields = NULL) {
 #' @return The function returns the processed groupby clause.
 
 rk.groupby <- function(groupby = NULL, mode = "@") {
-  if (is.null(groupby) || !nchar(groupby)) return("")
+  if (is.null(groupby) || !nchar(groupby)) {
+    return("")
+  }
 
   mcomma <- FALSE
   mgrpby <- ""
 
   grpby <- unlist(strsplit(groupby, ","))
   for (grp in grpby) {
-    if (!length(grep("^\\s*([\\w\\.]+|'((?:.(?!(?<![\\\\])'))*.?)')\\s*$", grp, ignore.case = TRUE, perl = TRUE)))
+    if (!length(grep("^\\s*([\\w\\.]+|'((?:.(?!(?<![\\\\])'))*.?)')\\s*$", grp, ignore.case = TRUE, perl = TRUE))) {
       stop(paste("Invalid group expression '", sub("^\\s*", "", sub("\\s*$", "", grp)), "' specified", sep = ""))
+    }
     grp <- sub("^\\s*", "", sub("\\s*$", "", grp))
 
-    if (mode == "@")
+    if (mode == "@") {
       mgrpby <- paste(mgrpby, ifelse(mcomma, ",", ""), "@", grp, sep = "")
-    else {
-      if (substr(grp, 1, 1) == "'" && substr(grp, nchar(grp), nchar(grp)) == "'")
+    } else {
+      if (substr(grp, 1, 1) == "'" && substr(grp, nchar(grp), nchar(grp)) == "'") {
         grp <- substr(grp, 2, nchar(grp) - 1)
+      }
       mgrpby <- paste(mgrpby, ifelse(mcomma, ",", ""), "'`", grp, "`'", sep = "")
     }
     mcomma <- TRUE
@@ -442,14 +483,14 @@ rk.groupby <- function(groupby = NULL, mode = "@") {
 rk.query <- function(dframe, fields = NULL, where = NULL, groupby = NULL) {
   .logTrace(paste("Query Fields '", fields, "' Where '", where, "' GroupBy '", groupby, "'", sep = ""), pr = FALSE)
 
-  if (is.null(fields))
+  if (is.null(fields)) {
     fields <- paste(names(dframe), collapse = ",")
+  }
 
   flds <- ifelse(is.null(groupby), fields, paste(groupby, fields, sep = ","))
   eval(parse(text = paste("dframe <- dframe[", rk.where(where, "dframe"), ", unique(c(", rk.fields(flds, ""), "))]", sep = "")))
 
   if (nchar(gby <- rk.groupby(groupby, ""))) {
-
     eval(parse(text = paste("dframe <- ddply(dframe, c(", gby, "), summarise, ", rk.fields(fields, "="), ")", sep = "")))
 
     # Rename the dataframe field names from the original names to the alias names
@@ -457,8 +498,9 @@ rk.query <- function(dframe, fields = NULL, where = NULL, groupby = NULL) {
     .qstov <- function(str) {
       vec <- c()
       for (s in unlist(strsplit(str, ","))) {
-        if (substr(s, 1, 1) == "'" && substr(s, nchar(s), nchar(s)) == "'")
+        if (substr(s, 1, 1) == "'" && substr(s, nchar(s), nchar(s)) == "'") {
           s <- substr(s, 2, nchar(s) - 1)
+        }
         vec <- c(vec, s)
       }
       return(vec)
@@ -469,13 +511,15 @@ rk.query <- function(dframe, fields = NULL, where = NULL, groupby = NULL) {
 
     fren <- c()
     for (fnam in names(dframe)) {
-      if (!is.na(k <- match(fnam, forg)))
+      if (!is.na(k <- match(fnam, forg))) {
         fnam <- fnew[k]
+      }
       fren <- c(fren, fnam)
     }
     names(dframe) <- fren
-  } else
+  } else {
     names(dframe) <- unlist(strsplit(rk.fields(fields, "*"), ","))
+  }
 
   return(dframe)
 }
