@@ -55,44 +55,42 @@ jira.login <- function(jira.env = NULL, jira.user = NULL, jira.pwd = NULL, jira.
     return(.logTrace("You have not yet authenticated into Jira Environment using Jira.Login() function"))
   }
 
-  ## 1) Try old on-prem approach: /rest/auth/1/session
-  resp <- GET(paste(pkg.globals$.jiraEnv, "/rest/auth/1/session", sep = ""))
-  if (resp$status_code == 401) {
-    # Session inactive or expired. Attempt to POST credentials for on-prem
-    if (exists("pkg.globals$.issueFields")) {
-      rm(pkg.globals$.issueFields)
-    }
-    .logTrace("Jira session inactive or expired. Sending login request")
-    resp2 <- POST(
-      paste(pkg.globals$.jiraEnv, "/rest/auth/1/session", sep = ""),
-      authenticate(pkg.globals$.jiraUser, pkg.globals$.jiraPwd),
-      add_headers("Content-Type" = "application/json")
-    )
-    if (resp2$status_code == 200) {
-      .logTrace("Jira Login Done (on-prem)")
+  # 1) Try to login using V2 (Cloud)
+  cloudCheck()
+
+  # 2) If V2 fail, try to login via V1 (on-premises)
+  if (!pkg.globals$.jiraIsActive) {
+    .logTrace("V2 login failed; attempting V1 login (on-premises)")
+    resp <- GET(paste0(pkg.globals$.jiraEnv, "/rest/auth/1/session"))
+    if (resp$status_code == 401) {
+      if (exists("pkg.globals$.issueFields")) {
+        rm(pkg.globals$.issueFields)
+      }
+      .logTrace("Jira session inactive or expired. Sending V1 login request.")
+      resp2 <- POST(
+        paste0(pkg.globals$.jiraEnv, "/rest/auth/1/session"),
+        authenticate(pkg.globals$.jiraUser, pkg.globals$.jiraPwd),
+        add_headers("Content-Type" = "application/json")
+      )
+      if (resp2$status_code == 200) {
+        .logTrace("Jira Login Done via V1 (on-premises)")
+        pkg.globals$.jiraIsActive <- TRUE
+        pkg.globals$.jiraLastLoginChk <- Sys.time()
+      } else {
+        .logTrace("Jira Login Failed via V1 endpoint.")
+        pkg.globals$.jiraIsActive <- FALSE
+      }
+    } else if (resp$status_code == 200) {
+      .logTrace("Jira session active (V1).")
       pkg.globals$.jiraIsActive <- TRUE
       pkg.globals$.jiraLastLoginChk <- Sys.time()
-    } else {
-      .logTrace("Jira Login Failed via on-prem session call; trying Cloud fallback")
+    } else if (resp$status_code == 404) {
+      .logTrace("Received 404 from V1 endpoint. On-premises login failed.")
       pkg.globals$.jiraIsActive <- FALSE
-      # Attempt Cloud
-      cloudCheck()
+    } else {
+      .logTrace(paste("Unexpected status code", resp$status_code, "from V1 endpoint."))
+      pkg.globals$.jiraIsActive <- FALSE
     }
-  } else if (resp$status_code == 200) {
-    # Already have an active session or no auth needed
-    .logTrace("Jira session active (on-prem).")
-    pkg.globals$.jiraIsActive <- TRUE
-    pkg.globals$.jiraLastLoginChk <- Sys.time()
-  } else if (resp$status_code == 404) {
-    # Possibly Jira Cloud (the on-prem auth endpoint doesn't exist)
-    .logTrace("Got 404 from /rest/auth/1/session. Trying Cloud fallback.")
-    pkg.globals$.jiraIsActive <- FALSE
-    cloudCheck()
-  } else {
-    # Some other code. Could be older on-prem or Cloud. We'll do a fallback anyway
-    .logTrace(paste("Unexpected status code", resp$status_code, "from /rest/auth/1/session. Attempting Cloud fallback."))
-    pkg.globals$.jiraIsActive <- FALSE
-    cloudCheck()
   }
 
   # If active, load the fields if not loaded
@@ -120,7 +118,6 @@ cloudCheck <- function() {
     pkg.globals$.jiraIsActive <- FALSE
   }
 }
-
 
 #' Jira Tables and Field Details
 #'
